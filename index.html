@@ -2,6 +2,11 @@
 <html lang="en">
 
 <head>
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#202124">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Daily Dispatch Video">
 
   <meta charset="UTF-8">
 
@@ -1377,7 +1382,25 @@ function clearError() {
 }
 
 </script>
-
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js')
+      .then(function (registration) {
+        console.log(
+          'PWA service worker registered:',
+          registration.scope
+        );
+      })
+      .catch(function (error) {
+        console.error(
+          'PWA service worker registration failed:',
+          error
+        );
+      });
+  });
+}
+</script>
 </body>
 
 </html>
