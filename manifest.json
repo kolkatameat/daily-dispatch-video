@@ -1,0 +1,12 @@
+{
+  "name": "Daily Dispatch Video",
+  "short_name": "Dispatch Video",
+  "description": "Before Dispatch Quality Video",
+  "start_url": "/daily-dispatch-video/",
+  "scope": "/daily-dispatch-video/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f8",
+  "theme_color": "#202124",
+  "prefer_related_applications": false
+}
