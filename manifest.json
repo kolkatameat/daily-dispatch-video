@@ -8,7 +8,6 @@
   "orientation": "portrait",
   "background_color": "#f4f6f8",
   "theme_color": "#202124",
-
   "icons": [
     {
       "src": "dispatch-icon-192.png",
