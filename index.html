@@ -1,1 +1,755 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
 
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+  <title>Daily Dispatch Video</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f4f6f8;
+      font-family: Arial, sans-serif;
+      color: #202124;
+    }
+
+    .app {
+      max-width: 520px;
+      min-height: 100vh;
+      margin: auto;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 25px;
+      margin: 20px 0 6px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 25px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+
+    .date {
+      text-align: center;
+      font-size: 21px;
+      font-weight: bold;
+      margin-bottom: 25px;
+    }
+
+    .camera-box {
+      display: none;
+      background: #000;
+      border-radius: 15px;
+      overflow: hidden;
+    }
+
+    #camera {
+      width: 100%;
+      display: block;
+      background: #000;
+    }
+
+    .button {
+      width: 100%;
+      border: none;
+      border-radius: 15px;
+      padding: 19px;
+      margin-top: 18px;
+      font-size: 19px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .start {
+      background: #202124;
+      color: white;
+    }
+
+    .stop {
+      background: #d93025;
+      color: white;
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 18px;
+      color: #666;
+      font-size: 15px;
+    }
+
+    .success {
+      display: none;
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 14px;
+      background: #e6f4ea;
+      color: #137333;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .error {
+      display: none;
+      margin-top: 18px;
+      padding: 15px;
+      border-radius: 12px;
+      background: #fce8e6;
+      color: #c5221f;
+      text-align: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <h1>🚚 DAILY DISPATCH VIDEO</h1>
+
+  <div class="subtitle">
+    Before Dispatch Quality Video
+  </div>
+
+  <div class="card">
+
+    <div id="date" class="date">
+      Loading...
+    </div>
+
+    <div id="cameraBox" class="camera-box">
+
+      <video
+        id="camera"
+        autoplay
+        muted
+        playsinline>
+      </video>
+
+    </div>
+
+    <button
+      id="startButton"
+      class="button start">
+
+      🎥 START RECORDING
+
+    </button>
+
+    <button
+      id="stopButton"
+      class="button stop hidden">
+
+      ⏹ STOP
+
+    </button>
+
+    <div
+      id="status"
+      class="status">
+    </div>
+
+    <div
+      id="success"
+      class="success">
+
+      ✅ VIDEO SENT
+
+    </div>
+
+    <div
+      id="error"
+      class="error">
+    </div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+/*
+ * Hidden maximum.
+ */
+const MAX_RECORDING_SECONDS = 40;
+
+
+/*
+ * Camera stream.
+ */
+let stream = null;
+
+
+/*
+ * MediaRecorder.
+ */
+let recorder = null;
+
+
+/*
+ * Recorded video chunks.
+ */
+let chunks = [];
+
+
+/*
+ * Recording start time.
+ */
+let recordingStartedAt = 0;
+
+
+/*
+ * Safety timer.
+ */
+let safetyTimer = null;
+
+
+/*
+ * Start button.
+ */
+document
+  .getElementById("startButton")
+  .addEventListener(
+    "click",
+    startRecording
+  );
+
+
+/*
+ * Stop button.
+ */
+document
+  .getElementById("stopButton")
+  .addEventListener(
+    "click",
+    stopRecording
+  );
+
+
+/*
+ * Show today's date.
+ */
+document
+  .getElementById("date")
+  .innerText =
+  new Date().toLocaleDateString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "long",
+      year: "numeric"
+    }
+  );
+
+
+/*
+ * START CAMERA + RECORDING
+ */
+async function startRecording() {
+
+  clearError();
+
+  try {
+
+    /*
+     * CAMERA ONLY.
+     *
+     * audio:false means microphone
+     * permission is NOT requested.
+     */
+    stream =
+      await navigator.mediaDevices.getUserMedia({
+
+        video: {
+
+          facingMode: {
+            ideal: "environment"
+          },
+
+          width: {
+            ideal: 1280
+          },
+
+          height: {
+            ideal: 720
+          }
+
+        },
+
+        audio: false
+
+      });
+
+
+    const camera =
+      document.getElementById("camera");
+
+
+    camera.srcObject = stream;
+
+
+    document
+      .getElementById("cameraBox")
+      .style.display = "block";
+
+
+    document
+      .getElementById("startButton")
+      .classList
+      .add("hidden");
+
+
+    document
+      .getElementById("stopButton")
+      .classList
+      .remove("hidden");
+
+
+    document
+      .getElementById("status")
+      .innerText =
+      "Recording...";
+
+
+    chunks = [];
+
+
+    /*
+     * Select supported recording format.
+     */
+    const mimeType =
+      getSupportedMimeType();
+
+
+    if (mimeType) {
+
+      recorder =
+        new MediaRecorder(
+          stream,
+          {
+            mimeType: mimeType
+          }
+        );
+
+    } else {
+
+      recorder =
+        new MediaRecorder(
+          stream
+        );
+
+    }
+
+
+    recorder.ondataavailable =
+      function(event) {
+
+        if (
+          event.data &&
+          event.data.size > 0
+        ) {
+
+          chunks.push(
+            event.data
+          );
+
+        }
+
+      };
+
+
+    recorder.onstop =
+      function() {
+
+        recordingFinished();
+
+      };
+
+
+    recorder.onerror =
+      function() {
+
+        cleanup();
+
+        resetUI();
+
+        showError(
+          "Recording failed. Please try again."
+        );
+
+      };
+
+
+    /*
+     * Start recording.
+     */
+    recorder.start(500);
+
+
+    recordingStartedAt =
+      Date.now();
+
+
+    /*
+     * Hidden 40-second safety limit.
+     */
+    safetyTimer =
+      setInterval(
+
+        function() {
+
+          const elapsed =
+            (
+              Date.now() -
+              recordingStartedAt
+            ) / 1000;
+
+
+          if (
+            elapsed >=
+            MAX_RECORDING_SECONDS
+          ) {
+
+            stopRecording();
+
+          }
+
+        },
+
+        250
+
+      );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showError(
+      "Camera could not be opened. Please allow camera access."
+    );
+
+  }
+
+}
+
+
+/*
+ * FIND SUPPORTED FORMAT
+ */
+function getSupportedMimeType() {
+
+  const formats = [
+
+    "video/mp4",
+
+    "video/webm;codecs=vp9",
+
+    "video/webm;codecs=vp8",
+
+    "video/webm"
+
+  ];
+
+
+  for (
+    const format of formats
+  ) {
+
+    if (
+      MediaRecorder.isTypeSupported(
+        format
+      )
+    ) {
+
+      return format;
+
+    }
+
+  }
+
+
+  return "";
+
+}
+
+
+/*
+ * STOP
+ */
+function stopRecording() {
+
+  if (
+    !recorder ||
+    recorder.state === "inactive"
+  ) {
+
+    return;
+
+  }
+
+
+  if (safetyTimer) {
+
+    clearInterval(
+      safetyTimer
+    );
+
+    safetyTimer = null;
+
+  }
+
+
+  document
+    .getElementById("stopButton")
+    .disabled = true;
+
+
+  document
+    .getElementById("stopButton")
+    .innerText =
+    "⏳ PROCESSING...";
+
+
+  recorder.stop();
+
+}
+
+
+/*
+ * RECORDING FINISHED
+ */
+function recordingFinished() {
+
+  cleanup();
+
+
+  if (
+    chunks.length === 0
+  ) {
+
+    resetUI();
+
+    showError(
+      "No video was recorded."
+    );
+
+    return;
+
+  }
+
+
+  const blob =
+    new Blob(
+
+      chunks,
+
+      {
+        type:
+          chunks[0].type ||
+          "video/webm"
+      }
+
+    );
+
+
+  /*
+   * For this first test we don't
+   * upload anywhere yet.
+   */
+  console.log(
+    "Recorded video size:",
+    blob.size
+  );
+
+
+  document
+    .getElementById("status")
+    .innerText =
+    "Video recorded successfully.";
+
+
+  document
+    .getElementById("success")
+    .style.display =
+    "block";
+
+
+  /*
+   * Temporary test result.
+   */
+  document
+    .getElementById("success")
+    .innerText =
+    "✅ CAMERA TEST SUCCESSFUL";
+
+
+  document
+    .getElementById("startButton")
+    .classList
+    .remove("hidden");
+
+
+  document
+    .getElementById("stopButton")
+    .classList
+    .add("hidden");
+
+
+  document
+    .getElementById("stopButton")
+    .disabled =
+    false;
+
+
+  document
+    .getElementById("stopButton")
+    .innerText =
+    "⏹ STOP";
+
+}
+
+
+/*
+ * CLEAN CAMERA
+ */
+function cleanup() {
+
+  if (safetyTimer) {
+
+    clearInterval(
+      safetyTimer
+    );
+
+    safetyTimer = null;
+
+  }
+
+
+  if (stream) {
+
+    stream
+      .getTracks()
+      .forEach(
+        function(track) {
+
+          track.stop();
+
+        }
+      );
+
+    stream = null;
+
+  }
+
+
+  document
+    .getElementById("camera")
+    .srcObject = null;
+
+}
+
+
+/*
+ * RESET UI
+ */
+function resetUI() {
+
+  cleanup();
+
+
+  document
+    .getElementById("cameraBox")
+    .style
+    .display = "none";
+
+
+  document
+    .getElementById("startButton")
+    .classList
+    .remove("hidden");
+
+
+  document
+    .getElementById("stopButton")
+    .classList
+    .add("hidden");
+
+
+  document
+    .getElementById("stopButton")
+    .disabled =
+    false;
+
+
+  document
+    .getElementById("stopButton")
+    .innerText =
+    "⏹ STOP";
+
+
+  document
+    .getElementById("status")
+    .innerText = "";
+
+}
+
+
+/*
+ * ERROR
+ */
+function showError(message) {
+
+  const box =
+    document.getElementById("error");
+
+
+  box.innerText =
+    message;
+
+
+  box.style.display =
+    "block";
+
+}
+
+
+function clearError() {
+
+  const box =
+    document.getElementById("error");
+
+
+  box.innerText = "";
+
+  box.style.display =
+    "none";
+
+}
+
+</script>
+
+</body>
+</html>
